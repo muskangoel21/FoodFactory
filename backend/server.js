@@ -2,65 +2,54 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 var users = require("./models/users");
+var userRoutes = require("./routes/user");
+var protectedRoutes = require("./routes/protectedRoutes");
+var jwt = require("jsonwebtoken");
 require("dotenv").config();
-
 const app = express();
 const port = process.env.PORT || 5000;
+JwtValidator = (req, res, next) => {
+  const header = req.headers.authorization;
+  const bearer = header.split(" ");
+  const token = bearer[1];
+  jwt.verify(token, process.env.secret, (err, data) => {
+    if (err) {
+      res.send(err);
+    }
+    users
+      .findOne({ _id: data._id })
+      .then(docs => {
+        if (docs) {
+          req.user = data._id;
+          next();
+        } else {
+          res.send("!user");
+        }
+      })
+      .catch(err => {
+        res.send(err);
+      });
+  });
+};
 
-/*app.use("*", (req, res, next) => {
-  console.log("MIDDLEWARE IS CALLED ");
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type,Access-Control-Allow-Headers,Access-Control-Allow-Headers,Authorization,X-Request-With"
-  );
-  res.setHeader("Access-Control-Allow-Methods", "*");
-  next();
-});
-*/
 app.use(cors());
 app.use(express.json());
+app.use("/", userRoutes);
+app.use("/protected", JwtValidator, protectedRoutes);
 
-//const uri = process.env.ATLAS_URI;
-// const uri ="mongodb+srv://foodfactory:9784530761@foodfactory-8w1e0.mongodb.net/test?retryWrites=true&w=majority";
-const uri = "mongodb://localhost:27017/food";
+const uri = process.env.ATLAS_URI;
 mongoose.connect(uri, {
   useNewUrlParser: true,
   useCreateIndex: true,
   useUnifiedTopology: true
 });
-mongoose.Promise = global.Promise;
+//mongoose.Promise = global.Promise;
 const connection = mongoose.connection;
 connection.once("open", () => {
   console.log("MongoDB database connection established successfully");
 });
 connection.on("error", err => {
   console.log("Error occurred");
-});
-app.post("/registerForm", (req, res) => {
-  let user = req.body;
-  users.find({ tel: req.body.tel }).then(docs => {
-    if (docs.length !== 0) {
-      res.send("found");
-    } else {
-      users.create(user);
-      res.send("Submitted");
-    }
-  });
-});
-app.post("/loginForm", (req, res) => {
-  users
-    .find({
-      tel: req.body.tel,
-      password: req.body.password
-    })
-    .then(docs => {
-      if (docs.length !== 0) {
-        res.send("found");
-      } else {
-        res.send("notfound");
-      }
-    });
 });
 app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);
